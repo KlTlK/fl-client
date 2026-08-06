@@ -35,6 +35,10 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.22.x'
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
       - run: flutter build windows --release
