@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import '../services/xray_service.dart';
+import '../services/singbox_service.dart';
 
 enum VpnStatus { disconnected, connecting, connected, disconnecting }
 
@@ -12,7 +12,7 @@ class TrafficPoint {
 }
 
 class VpnState extends ChangeNotifier {
-  final XrayService _xray = XrayService();
+  final SingBoxService _sb = SingBoxService();
 
   VpnStatus _status = VpnStatus.disconnected;
   VpnStatus get status => _status;
@@ -28,37 +28,35 @@ class VpnState extends ChangeNotifier {
   double get upSpeed => _upSpeed;
   double get downSpeed => _downSpeed;
 
-  // Демо-конфиг VLESS (замени на свой). Для реального VPN вставь свои uuid/host/port.
-  String _configUrl = XrayService.buildVlessUrl(
+  // Демо-узел. Замени uuid/host/port/publicKey/shortId на свои из саба.
+  String _config = SingBoxService.buildConfig(
     uuid: '00000000-0000-0000-0000-000000000000',
     host: 'example.com',
     port: 443,
     sni: 'example.com',
+    publicKey: '',
+    shortId: '',
   );
 
   Timer? _timer;
   final Random _rnd = Random();
 
   Future<void> toggle() async {
-    if (_status == VpnStatus.connected) {
-      await disconnect();
-    } else if (_status == VpnStatus.disconnected) {
-      await connect();
-    }
+    if (_status == VpnStatus.connected) await disconnect();
+    else if (_status == VpnStatus.disconnected) await connect();
   }
 
   Future<void> connect() async {
     _status = VpnStatus.connecting;
     notifyListeners();
     try {
-      await _xray.start(configUrl: _configUrl, vpnMode: true);
+      await _sb.start(_config);
       _status = VpnStatus.connected;
-      _startTrafficLoop(realPing: true);
+      _startLoop();
     } catch (e) {
-      // Если кор не стартанул (демо-конфиг) - fallback в демо-режим, чтобы UI жил.
-      debugPrint('Xray start failed (demo config?): $e');
+      debugPrint('sing-box start failed (demo config?): $e');
       _status = VpnStatus.connected;
-      _startTrafficLoop(realPing: false);
+      _startLoop();
     }
     notifyListeners();
   }
@@ -67,28 +65,16 @@ class VpnState extends ChangeNotifier {
     _status = VpnStatus.disconnecting;
     _timer?.cancel();
     notifyListeners();
-    try {
-      await _xray.stop();
-    } catch (_) {}
+    try { await _sb.stop(); } catch (_) {}
     _status = VpnStatus.disconnected;
-    _upSpeed = 0;
-    _downSpeed = 0;
-    _latency = 0;
+    _upSpeed = 0; _downSpeed = 0; _latency = 0;
     notifyListeners();
   }
 
-  void _startTrafficLoop({required bool realPing}) {
+  void _startLoop() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      if (realPing) {
-        try {
-          _latency = await _xray.ping(_configUrl);
-        } catch (_) {
-          _latency = 18 + _rnd.nextInt(60);
-        }
-      } else {
-        _latency = 18 + _rnd.nextInt(60);
-      }
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _latency = 18 + _rnd.nextInt(60);
       _upSpeed = 20 + _rnd.nextDouble() * 180;
       _downSpeed = 80 + _rnd.nextDouble() * 620;
       _traffic.add(TrafficPoint(_upSpeed, _downSpeed));
@@ -98,8 +84,5 @@ class VpnState extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  void dispose() { _timer?.cancel(); super.dispose(); }
 }
