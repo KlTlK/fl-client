@@ -2,14 +2,17 @@
 
 Xray-based VPN client built with Flutter, UI/animation style inspired by FlClash.
 
-## Status
-Scaffold + animated UI shell. Xray core binding is a TODO (requires platform channels / FFI to libXray).
+## Core
+Uses `flutter_v2ray_client` which wraps the real **xray-core** engine (the same one powering v2rayNG / FlClash) [[2]][[3]].
+- Android: full VPN mode via the core.
+- The Xray service lives in `lib/services/xray_service.dart`.
+- Replace the demo VLESS config in `lib/state/vpn_state.dart` (`_configUrl`) with your own uuid/host/port to actually route traffic.
 
 ## Features
 - Animated power/connect toggle (FlClash-style pulse & glow)
 - Live traffic chart (upload/download) with smooth animations
-- Latency ping card with ripple effect
-- Config import placeholder (VLESS / VMess / Reality)
+- Real latency ping via Xray core (falls back to demo if core cannot start)
+- Config builder for VLESS / Reality
 - Dark neon theme
 
 ## Build
@@ -17,6 +20,6 @@ Scaffold + animated UI shell. Xray core binding is a TODO (requires platform cha
     flutter run
 
 ## GitHub Actions
-See `.github/workflows/build.yml` - produces Android APK and Windows EXE as artifacts on every push to `main`.
+`.github/workflows/build.yml` produces Android APK and Windows EXE as artifacts on every push to `main`.
 
-> Note: actual packet forwarding needs the Xray core wired via platform channels. This repo ships the full animated UI and the CI pipeline.
+> Note: desktop (Windows) VPN/TUN needs an extra native binding; the shipped plugin covers Android VPN out of the box. Windows build compiles the UI + core lib.
