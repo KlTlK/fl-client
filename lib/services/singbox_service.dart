@@ -1,69 +1,38 @@
 import 'dart:async';
-import 'dart:convert';
 import '../core/singbox_ffi.dart';
+import '../core/proxy_parser.dart';
+import '../core/singbox_outbound_builder.dart';
 
-/// Высокоуровневый сервис поверх FFI-ядра (Hiddify-style: Flutter UI + libsingbox через dart:ffi).
-/// Один кор на все платформы, TUN нативный везде (sing-tun на Windows).
+/// Сервис поверх FFI-ядра. Принимает сырую строку (ссылку или base64-саб),
+/// парсит через [ProxyParser], собирает sing-box config через [SingBoxOutboundBuilder],
+/// валидирует и стартует кор. Жрёт любые сабы.
 class SingBoxService {
   final SingBoxFFI _ffi = SingBoxFFI();
   int _handle = 0;
   bool get running => _handle > 0;
 
-  static String buildConfig({
-    required String uuid,
-    required String host,
-    required int port,
-    String flow = 'xtls-rprx-vision',
-    String security = 'reality',
-    String sni = '',
-    String publicKey = '',
-    String shortId = '',
-    String fingerprint = 'chrome',
-  }) {
-    final outbound = {
-      'type': 'vless', 'tag': 'proxy',
-      'server': host, 'server_port': port, 'uuid': uuid, 'flow': flow,
-      'tls': {
-        'enabled': true,
-        'server_name': sni.isEmpty ? host : sni,
-        'utls': {'enabled': true, 'fingerprint': fingerprint},
-        if (security == 'reality')
-          'reality': {'enabled': true, 'public_key': publicKey, 'short_id': shortId},
-      },
-    };
-    return jsonEncode({
-      'log': {'level': 'warn'},
-      'inbounds': [
-        {
-          'type': 'tun', 'tag': 'tun-in',
-          'inet4_address': '172.19.0.1/30',
-          'auto_route': true, 'strict_route': true, 'stack': 'system',
-        }
-      ],
-      'outbounds': [
-        outbound,
-        {'type': 'direct', 'tag': 'direct'},
-        {'type': 'block', 'tag': 'block'},
-      ],
-      'route': {
-        'rules': [{'ip_is_private': true, 'outbound': 'direct'}],
-        'final': 'proxy',
-        'auto_detect_interface': true,
-      },
-    });
+  List<ParsedNode> _nodes = const [];
+  List<ParsedNode> get nodes => _nodes;
+
+  /// Импортирует подписку/ссылку. Возвращает распарсенные узлы.
+  List<ParsedNode> importConfig(String input) {
+    _nodes = ProxyParser.parseAny(input);
+    return _nodes;
   }
 
-  /// Валидирует конфиг до старта (ошибка -> exception).
-  void validate(String configJson) {
-    final err = _ffi.validate(configJson);
+  Future<void> startNode(ParsedNode node) async {
+    final config = SingBoxOutboundBuilder.buildFullConfig(node);
+    final err = _ffi.validate(config);
     if (err.isNotEmpty) throw ArgumentError('sing-box config invalid: $err');
-  }
-
-  Future<void> start(String configJson) async {
-    validate(configJson);
-    final h = _ffi.start(configJson);
+    final h = _ffi.start(config);
     if (h <= 0) throw StateError('sing-box failed to start (code $h)');
     _handle = h;
+  }
+
+  /// Стартует первый узел из импортированного саба.
+  Future<void> startFirst() async {
+    if (_nodes.isEmpty) throw StateError('no nodes imported');
+    await startNode(_nodes.first);
   }
 
   Future<void> stop() async {
