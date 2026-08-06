@@ -1,7 +1,7 @@
 name: fl_client
-description: Xray VPN client in FlClash style with animations.
+description: Sing-box VPN client in FlClash style with animations.
 publish_to: 'none'
-version: 0.2.0+2
+version: 0.3.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -16,7 +16,7 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.2.3
   fl_chart: ^0.68.0
-  flutter_v2ray_client: ^2.0.0
+  flutter_singbox_vpn: ^1.1.2
 
 dev_dependencies:
   flutter_test:
