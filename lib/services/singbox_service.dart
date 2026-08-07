@@ -65,4 +65,8 @@ class SingBoxService {
     }
     if (firstError != null) throw StateError('core shutdown warning: $firstError');
   }
+
+  List<String> get processLogs => _proc.logs;
+  void clearLogs() => _proc.clearLogs();
+
 }
