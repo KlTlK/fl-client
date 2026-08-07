@@ -1,4 +1,4 @@
-name: Build Flutter (APK + EXE)
+name: Build Flutter (APK + EXE) + Parser tests
 
 on:
   push:
@@ -6,6 +6,18 @@ on:
   workflow_dispatch:
 
 jobs:
+  parser-tests:
+    name: Parser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test test/proxy_parser_test.dart
+
   android-apk:
     name: Android APK
     runs-on: ubuntu-latest
