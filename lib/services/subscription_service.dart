@@ -14,7 +14,9 @@ class SubscriptionService {
       if (resp.statusCode >= 300 && resp.statusCode < 400) {
         final loc = resp.headers['location'];
         if (loc != null && loc.isNotEmpty) {
-          final req2 = http.Request('GET', Uri.resolve(url.trim(), loc));
+          // Resolve relative redirects against the original URL
+          final redirectUri = Uri.parse(url.trim()).resolve(loc);
+          final req2 = http.Request('GET', redirectUri);
           req2.headers['User-Agent'] = 'fl-client/0.8';
           req2.followRedirects = false;
           resp = await http.Response.fromStream(
