@@ -1,20 +1,28 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'theme/app_theme.dart';
+import 'state/vpn_state.dart';
+import 'screens/home_screen.dart';
 
 void main() {
-  // Write a file immediately to prove Dart is running
-  try {
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    File('$exeDir\\dart_alive.txt').writeAsStringSync('Dart main() executed at ${DateTime.now()}');
-  } catch (_) {}
-
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: Scaffold(
-      backgroundColor: Color(0xFF0E1117),
-      body: Center(
-        child: Text('fl-client is alive!', style: TextStyle(color: Color(0xFF3DF5C8), fontSize: 24)),
-      ),
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => VpnState()..bootstrap(),
+      child: const FlClientApp(),
     ),
-  ));
+  );
+}
+
+class FlClientApp extends StatelessWidget {
+  const FlClientApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'fl-client',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark,
+      home: const HomeScreen(),
+    );
+  }
 }
