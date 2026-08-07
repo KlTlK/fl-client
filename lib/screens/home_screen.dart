@@ -171,20 +171,30 @@ class _HomeScreenState extends State<HomeScreen> {
         side: const BorderSide(color: AppTheme.card)));
 
   void _showLogs(BuildContext context, VpnState vpn) {
-    showModalBottomSheet(context: context, backgroundColor: AppTheme.surface,
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => DraggableScrollableSheet(initialChildSize: 0.6, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
-        builder: (_, sc) => Column(children: [
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
+        builder: (ctx, sc) => Column(children: [
           Padding(padding: const EdgeInsets.all(16), child: Row(children: [
             const Text('Logs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const Spacer(),
             TextButton(onPressed: () => vpn.clearLogs(), child: const Text('Clear')),
           ])),
-          Expanded(child: ListView.builder(controller: sc, padding: const EdgeInsets.symmetric(horizontal: 16),
+          Expanded(child: ListView.builder(
+            controller: sc,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: vpn.logLines.length,
-            itemBuilder: (_, i) => Padding(padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(vpn.logLines[i], style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppTheme.textSecondary)))),
-        ])));
+            itemBuilder: (ctx2, i) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(vpn.logLines[i], style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppTheme.textSecondary)),
+            ),
+          )),
+        ]),
+      ),
+    );
   }
 
   void _showSettings(BuildContext context, VpnState vpn) {
