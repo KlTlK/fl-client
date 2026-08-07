@@ -27,48 +27,39 @@ jobs:
       CMAKE_GENERATOR: Visual Studio 17 2022
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.5'
           channel: stable
           cache: true
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
+
+      - name: Fetch prebuilt sing-box.exe
+        run: .\scripts\fetch_sing_box.ps1
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: '3.22.x'
 
-      - name: Build sing-box.exe from source
-        shell: bash
-        run: |
-          git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src
-          cd core/singbox-src
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -buildid=" -o ../../libs/windows/sing-box.exe ./cmd/sing-box
-
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
       - run: flutter build windows --release
 
       - name: Assemble setup package
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p dist/fl-client-windows
-          # Flutter build output
-          cp -r build/windows/x64/runner/Release/* dist/fl-client-windows/
-          # sing-box core next to the exe
-          cp libs/windows/sing-box.exe dist/fl-client-windows/
-          # launcher / readme
-          cp scripts/install.bat dist/fl-client-windows/ 2>/dev/null || true
-          cp scripts/README-WINDOWS.txt dist/fl-client-windows/ 2>/dev/null || true
+          $dest = "dist\fl-client-windows"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item -Path "build\windows\x64\runner\Release\*" -Destination $dest -Recurse -Force
+          Copy-Item -Path "libs\windows\sing-box.exe" -Destination $dest -Force
+          if (Test-Path "scripts\install.bat") { Copy-Item "scripts\install.bat" $dest -Force }
+          if (Test-Path "scripts\README-WINDOWS.txt") { Copy-Item "scripts\README-WINDOWS.txt" $dest -Force }
 
       - name: Zip setup package
-        shell: bash
+        shell: pwsh
         run: |
-          cd dist
-          powershell Compress-Archive -Path fl-client-windows -DestinationPath fl-client-windows.zip
+          Compress-Archive -Path "dist\fl-client-windows" -DestinationPath "dist\fl-client-windows.zip"
 
       - uses: actions/upload-artifact@v4
         with:
