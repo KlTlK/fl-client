@@ -42,52 +42,45 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
 
-      - name: Copy VC++ runtime DLLs next to exe
+      - name: Debug - list Release folder contents
         shell: pwsh
         run: |
-          $releaseDir = "build\windows\x64\runner\Release"
-          # Find VC++ runtime DLLs from the VS installation
-          $vcrtPaths = @(
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC",
-            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC",
-            "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
-          )
-          $found = $false
-          foreach ($base in $vcrtPaths) {
-            if (Test-Path $base) {
-              $dlls = Get-ChildItem -Path $base -Recurse -Filter "vcruntime140.dll" | Where-Object { $_.DirectoryName -match "x64" } | Select-Object -First 1
-              if ($dlls) {
-                $dir = $dlls.DirectoryName
-                Copy-Item "$dir\vcruntime140.dll" "$releaseDir\" -Force
-                Copy-Item "$dir\vcruntime140_1.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
-                Copy-Item "$dir\msvcp140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
-                Write-Output "Copied VC++ runtime from $dir"
-                $found = $true
-                break
-              }
-            }
+          Write-Output "=== Release folder ==="
+          Get-ChildItem -Path "build\windows\x64\runner\Release" -Recurse | ForEach-Object { Write-Output "$($_.FullName.Replace((Get-Location).Path + '\', ''))  $($_.Length) bytes" }
+          Write-Output ""
+          Write-Output "=== data folder ==="
+          if (Test-Path "build\windows\x64\runner\Release\data") {
+            Get-ChildItem -Path "build\windows\x64\runner\Release\data" -Recurse | ForEach-Object { Write-Output "$($_.FullName.Replace((Get-Location).Path + '\', ''))  $($_.Length) bytes" }
+          } else {
+            Write-Output "data/ folder DOES NOT EXIST!"
           }
-          if (-not $found) {
-            # Fallback: try system32
-            Copy-Item "C:\Windows\System32\vcruntime140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
-            Copy-Item "C:\Windows\System32\vcruntime140_1.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
-            Copy-Item "C:\Windows\System32\msvcp140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
-            Write-Output "Copied VC++ runtime from System32 (fallback)"
+          Write-Output ""
+          Write-Output "=== flutter_assets ==="
+          if (Test-Path "build\windows\x64\runner\Release\data\flutter_assets") {
+            Get-ChildItem -Path "build\windows\x64\runner\Release\data\flutter_assets" | ForEach-Object { Write-Output "$($_.Name)  $($_.Length) bytes" }
+          } else {
+            Write-Output "flutter_assets/ DOES NOT EXIST!"
           }
 
-      - name: Copy sing-box.exe to Release
+      - name: Copy VC++ runtime DLLs
         shell: pwsh
         run: |
-          Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
+          $d = "build\windows\x64\runner\Release"
+          $paths = @("C:\Windows\System32\vcruntime140.dll","C:\Windows\System32\vcruntime140_1.dll","C:\Windows\System32\msvcp140.dll")
+          foreach ($p in $paths) { if (Test-Path $p) { Copy-Item $p "$d\" -Force; Write-Output "Copied $p" } }
+
+      - name: Copy sing-box.exe
+        shell: pwsh
+        run: Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
 
       - name: Create debug launcher
         shell: pwsh
         run: |
           $d = "build\windows\x64\runner\Release"
-          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho.`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`necho.`r`n`"%~dp0fl_client.exe`"`r`necho.`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n)`r`npause"
+          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho.`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`necho.`r`n`"%~dp0fl_client.exe`"`r`necho.`r`necho Exit code: %errorlevel%`r`necho.`r`nif exist `"%~dp0dart_alive.txt`" (`r`n    echo dart_alive.txt EXISTS - Dart code ran!`r`n    type `"%~dp0dart_alive.txt`"`r`n) else (`r`n    echo dart_alive.txt NOT FOUND - Dart never started`r`n)`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n)`r`npause"
           $bat | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
 
-      - name: Zip everything
+      - name: Zip
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
