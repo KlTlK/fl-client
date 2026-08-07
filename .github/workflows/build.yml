@@ -46,7 +46,7 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
 
-      - name: Create debug launcher (fl_client_debug.bat)
+      - name: Create debug launcher
         shell: pwsh
         run: |
           $releaseDir = "build\windows\x64\runner\Release"
@@ -77,9 +77,8 @@ jobs:
       - name: Package portable zip
         shell: pwsh
         run: |
-          $dest = "dist\fl-client-portable.zip"
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath $dest
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist\fl-client-portable.zip"
 
       - uses: actions/upload-artifact@v4
         with:
