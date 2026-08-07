@@ -27,64 +27,41 @@ jobs:
       CMAKE_GENERATOR: Visual Studio 17 2022
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.5'
           channel: stable
           cache: true
-
       - name: Fetch prebuilt sing-box.exe
         run: .\scripts\fetch_sing_box.ps1
-
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: '3.22.x'
-
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
       - run: flutter build windows --release
-
       - name: Create debug launcher
         shell: pwsh
         run: |
-          $releaseDir = "build\windows\x64\runner\Release"
-          @"
-          @echo off
-          title fl-client debug
-          echo Starting fl_client.exe from %~dp0
-          echo.
-          "%~dp0fl_client.exe" %*
-          echo.
-          echo Exit code: %errorlevel%
-          if exist "%~dp0crash.log" (
-              echo === crash.log ===
-              type "%~dp0crash.log"
-          )
-          pause
-          "@ | Out-File -FilePath "$releaseDir\fl_client_debug.bat" -Encoding ascii
-
+          $d = "build\windows\x64\runner\Release"
+          "@echo off`r`ntitle fl-client debug`r`necho Starting...`r`n`"%~dp0fl_client.exe`" %*`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0crash.log`" type `"%~dp0crash.log`"`r`npause" | Out-File "$d\fl_client_debug.bat" -Encoding ascii
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
-
       - name: Build installer
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           & $iscc "windows\installer\fl_client.iss"
-
       - name: Package portable zip
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist\fl-client-portable.zip"
-
       - uses: actions/upload-artifact@v4
         with:
           name: fl-client-setup-exe
           path: Output/fl-client-setup.exe
-
       - uses: actions/upload-artifact@v4
         with:
           name: fl-client-portable-zip
