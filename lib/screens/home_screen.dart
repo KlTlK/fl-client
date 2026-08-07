@@ -23,6 +23,7 @@ class HomeScreen extends StatelessWidget {
     return Consumer<VpnState>(builder: (context, vpn, _) {
       final connected = vpn.status == VpnStatus.connected;
       final node = vpn.selectedNode;
+      final lat = vpn.latency;
       return Scaffold(
         body: SafeArea(
           child: SingleChildScrollView(
@@ -35,10 +36,15 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     const Text('fl-client',
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.settings_rounded),
-                    ),
+                    Row(children: [
+                      Icon(Icons.circle, size: 10,
+                          color: vpn.coreAvailable ? AppTheme.neon : AppTheme.danger),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        onPressed: () {},
+                        icon: const Icon(Icons.settings_rounded),
+                      ),
+                    ]),
                   ],
                 ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.2, end: 0),
                 const SizedBox(height: 30),
@@ -77,7 +83,8 @@ class HomeScreen extends StatelessWidget {
                   crossAxisSpacing: 14,
                   childAspectRatio: 1.7,
                   children: [
-                    StatCard(label: 'Latency', value: '${vpn.latency} ms',
+                    StatCard(label: 'Latency (${vpn.pingMethod.name})',
+                        value: lat > 0 ? '$lat ms' : '--',
                         icon: Icons.speed_rounded, color: AppTheme.neon),
                     StatCard(label: 'Download', value: '${vpn.downSpeed.toStringAsFixed(0)} KB/s',
                         icon: Icons.arrow_downward_rounded, color: AppTheme.neonAlt),
