@@ -28,7 +28,6 @@ class TrafficChart extends StatelessWidget {
         height: 180,
         child: LineChart(
           LineChartData(
-            animationDuration: const Duration(milliseconds: 600),
             gridData: const FlGridData(show: false),
             titlesData: const FlTitlesData(show: false),
             borderData: FlBorderData(show: false),
