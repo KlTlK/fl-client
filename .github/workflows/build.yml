@@ -41,52 +41,33 @@ jobs:
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
       - run: flutter build windows --release
-
-      - name: Debug - list Release folder contents
-        shell: pwsh
-        run: |
-          Write-Output "=== Release folder ==="
-          Get-ChildItem -Path "build\windows\x64\runner\Release" -Recurse | ForEach-Object { Write-Output "$($_.FullName.Replace((Get-Location).Path + '\', ''))  $($_.Length) bytes" }
-          Write-Output ""
-          Write-Output "=== data folder ==="
-          if (Test-Path "build\windows\x64\runner\Release\data") {
-            Get-ChildItem -Path "build\windows\x64\runner\Release\data" -Recurse | ForEach-Object { Write-Output "$($_.FullName.Replace((Get-Location).Path + '\', ''))  $($_.Length) bytes" }
-          } else {
-            Write-Output "data/ folder DOES NOT EXIST!"
-          }
-          Write-Output ""
-          Write-Output "=== flutter_assets ==="
-          if (Test-Path "build\windows\x64\runner\Release\data\flutter_assets") {
-            Get-ChildItem -Path "build\windows\x64\runner\Release\data\flutter_assets" | ForEach-Object { Write-Output "$($_.Name)  $($_.Length) bytes" }
-          } else {
-            Write-Output "flutter_assets/ DOES NOT EXIST!"
-          }
-
       - name: Copy VC++ runtime DLLs
         shell: pwsh
         run: |
           $d = "build\windows\x64\runner\Release"
-          $paths = @("C:\Windows\System32\vcruntime140.dll","C:\Windows\System32\vcruntime140_1.dll","C:\Windows\System32\msvcp140.dll")
-          foreach ($p in $paths) { if (Test-Path $p) { Copy-Item $p "$d\" -Force; Write-Output "Copied $p" } }
-
+          @("C:\Windows\System32\vcruntime140.dll","C:\Windows\System32\vcruntime140_1.dll","C:\Windows\System32\msvcp140.dll") | ForEach-Object { if (Test-Path $_) { Copy-Item $_ "$d\" -Force } }
       - name: Copy sing-box.exe
         shell: pwsh
         run: Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
-
       - name: Create debug launcher
         shell: pwsh
         run: |
           $d = "build\windows\x64\runner\Release"
-          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho.`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`necho.`r`n`"%~dp0fl_client.exe`"`r`necho.`r`necho Exit code: %errorlevel%`r`necho.`r`nif exist `"%~dp0dart_alive.txt`" (`r`n    echo dart_alive.txt EXISTS - Dart code ran!`r`n    type `"%~dp0dart_alive.txt`"`r`n) else (`r`n    echo dart_alive.txt NOT FOUND - Dart never started`r`n)`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n)`r`npause"
-          $bat | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
-
-      - name: Zip
+          $b = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`n`"%~dp0fl_client.exe`"`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0dart_alive.txt`" (echo Dart ran! & type `"%~dp0dart_alive.txt`")`r`nif exist `"%~dp0crash.log`" (echo === crash.log === & type `"%~dp0crash.log`")`r`npause"
+          $b | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist\fl-client-windows.zip"
-
+          New-Item -ItemType Directory -Path Output -Force | Out-Null
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "windows\installer\fl_client.iss"
       - uses: actions/upload-artifact@v4
         with:
           name: fl-client-windows
-          path: dist/fl-client-windows.zip
+          path: build/windows/x64/runner/Release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fl-client-installer
+          path: Output/fl-client-setup.exe
