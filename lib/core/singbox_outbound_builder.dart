@@ -16,7 +16,7 @@ class SingBoxOutboundBuilder {
   static Map<String, dynamic> _vless(ParsedNode n) {
     final sec = (n.raw['security'] ?? '').toString();
     return {
-      'type': 'vless', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+      'type': 'vless', 'tag': 'proxy', 'server': n.host, 'server_port': n.port,
       'uuid': (n.raw['uuid'] ?? '').toString(),
       'flow': (n.raw['flow'] ?? '').toString(),
       if (sec.isNotEmpty) 'tls': _tls(n, reality: sec == 'reality'),
@@ -26,7 +26,7 @@ class SingBoxOutboundBuilder {
   static Map<String, dynamic> _vmess(ParsedNode n) {
     final tls = (n.raw['tls'] ?? '').toString() == 'tls';
     return {
-      'type': 'vmess', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+      'type': 'vmess', 'tag': 'proxy', 'server': n.host, 'server_port': n.port,
       'uuid': (n.raw['id'] ?? '').toString(),
       'security': (n.raw['scy'] ?? 'auto').toString(),
       'alter_id': int.tryParse((n.raw['aid'] ?? '0').toString()) ?? 0,
@@ -35,18 +35,18 @@ class SingBoxOutboundBuilder {
   }
 
   static Map<String, dynamic> _trojan(ParsedNode n) => {
-    'type': 'trojan', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'type': 'trojan', 'tag': 'proxy', 'server': n.host, 'server_port': n.port,
     'password': (n.raw['password'] ?? '').toString(), 'tls': _tls(n),
   };
 
   static Map<String, dynamic> _shadowsocks(ParsedNode n) => {
-    'type': 'shadowsocks', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'type': 'shadowsocks', 'tag': 'proxy', 'server': n.host, 'server_port': n.port,
     'method': (n.raw['method'] ?? 'aes-128-gcm').toString(),
     'password': (n.raw['password'] ?? '').toString(),
   };
 
   static Map<String, dynamic> _hysteria2(ParsedNode n) => {
-    'type': 'hysteria2', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'type': 'hysteria2', 'tag': 'proxy', 'server': n.host, 'server_port': n.port,
     'password': (n.raw['password'] ?? '').toString(), 'tls': _tls(n),
   };
 
