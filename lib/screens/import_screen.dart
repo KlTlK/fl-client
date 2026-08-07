@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../state/vpn_state.dart';
+import '../core/pinger.dart';
 
 class ImportScreen extends StatefulWidget {
   const ImportScreen({super.key});
@@ -14,6 +15,15 @@ class _ImportScreenState extends State<ImportScreen> {
   final _rawCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // подгружаем сохранённые ноды
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<VpnState>().bootstrap();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Import')),
@@ -21,7 +31,6 @@ class _ImportScreenState extends State<ImportScreen> {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // URL подписки
             TextField(
               controller: _urlCtrl,
               decoration: const InputDecoration(
@@ -36,13 +45,11 @@ class _ImportScreenState extends State<ImportScreen> {
               label: const Text('Fetch subscription'),
             ),
             const SizedBox(height: 20),
-
-            // Raw строка / QR результат
             TextField(
               controller: _rawCtrl,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Paste link / base64 / QR result',
+                labelText: 'Paste link / base64',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -66,6 +73,26 @@ class _ImportScreenState extends State<ImportScreen> {
             ]),
             const SizedBox(height: 20),
 
+            // Переключатель метода пинга + кнопка пингануть все
+            Row(children: [
+              const Text('Ping: ', style: TextStyle(color: Colors.white70)),
+              SegmentedButton<PingMethod>(
+                segments: const [
+                  ButtonSegment(value: PingMethod.tcp, label: Text('TCP')),
+                  ButtonSegment(value: PingMethod.httpGet, label: Text('HTTP GET')),
+                ],
+                selected: {vpn.pingMethod},
+                onSelectionChanged: (s) => vpn.setPingMethod(s.first),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: vpn.nodes.isEmpty ? null : () => vpn.pingAll(),
+                icon: const Icon(Icons.speed_rounded),
+                label: const Text('Ping all'),
+              ),
+            ]),
+            const SizedBox(height: 16),
+
             if (vpn.error != null)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -75,14 +102,15 @@ class _ImportScreenState extends State<ImportScreen> {
                 ),
                 child: Text(vpn.error!, style: const TextStyle(color: AppTheme.danger)),
               ),
+            const SizedBox(height: 12),
 
-            const SizedBox(height: 16),
             Text('Nodes (${vpn.nodes.length})',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             ...List.generate(vpn.nodes.length, (i) {
               final n = vpn.nodes[i];
               final selected = i == vpn.selectedIndex;
+              final lat = vpn.latencyFor(i);
               return Card(
                 color: selected ? AppTheme.neon.withOpacity(0.12) : AppTheme.surface,
                 child: ListTile(
@@ -90,9 +118,12 @@ class _ImportScreenState extends State<ImportScreen> {
                       color: selected ? AppTheme.neon : Colors.white54),
                   title: Text(n.name.isEmpty ? n.host : n.name),
                   subtitle: Text('${n.protocol} • ${n.host}:${n.port}'),
-                  trailing: selected
-                      ? const Icon(Icons.check_circle_rounded, color: AppTheme.neon)
-                      : null,
+                  trailing: lat == null
+                      ? const Text('-- ms', style: TextStyle(color: Colors.white38))
+                      : Text('$lat ms',
+                          style: TextStyle(
+                              color: lat < 200 ? AppTheme.neon : AppTheme.danger,
+                              fontWeight: FontWeight.w700)),
                   onTap: () => vpn.selectNode(i),
                 ),
               );
