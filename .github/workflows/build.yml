@@ -40,7 +40,13 @@ jobs:
           cmake-version: '3.22.x'
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
-      - run: flutter build windows --release
+      - name: Build (capture errors)
+        shell: pwsh
+        run: |
+          $output = flutter build windows --release 2>&1 | Out-String
+          $output | Out-File "build_errors.txt" -Encoding utf8
+          Write-Output $output
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Copy VC++ runtime DLLs
         shell: pwsh
         run: |
@@ -56,6 +62,12 @@ jobs:
           $b = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`n`"%~dp0fl_client.exe`"`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0dart_alive.txt`" (echo Dart ran! & type `"%~dp0dart_alive.txt`")`r`nif exist `"%~dp0crash.log`" (echo === crash.log === & type `"%~dp0crash.log`")`r`npause"
           $b | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-errors
+          path: build_errors.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: fl-client-windows
           path: build/windows/x64/runner/Release/
