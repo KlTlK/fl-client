@@ -5,27 +5,24 @@ class SubscriptionService {
   Future<List<ParsedNode>> fetch(String url) async {
     final client = http.Client();
     try {
-      final req = http.Request('GET', Uri.parse(url.trim()));
-      req.headers['User-Agent'] = 'fl-client/0.8';
-      req.followRedirects = false;
-      var resp = await http.Response.fromStream(
-        await client.send(req).timeout(const Duration(seconds: 20)),
-      );
-      if (resp.statusCode >= 300 && resp.statusCode < 400) {
-        final loc = resp.headers['location'];
-        if (loc != null && loc.isNotEmpty) {
-          // Resolve relative redirects against the original URL
-          final redirectUri = Uri.parse(url.trim()).resolve(loc);
-          final req2 = http.Request('GET', redirectUri);
-          req2.headers['User-Agent'] = 'fl-client/0.8';
-          req2.followRedirects = false;
-          resp = await http.Response.fromStream(
-            await client.send(req2).timeout(const Duration(seconds: 20)),
-          );
+      var currentUrl = url.trim();
+      for (var i = 0; i < 5; i++) {
+        final req = http.Request('GET', Uri.parse(currentUrl));
+        req.headers['User-Agent'] = 'clash-verge/v1.5.0';
+        req.followRedirects = false;
+        final resp = await http.Response.fromStream(
+          await client.send(req).timeout(const Duration(seconds: 15)),
+        );
+        if (resp.statusCode == 200) return ProxyParser.parseAny(resp.body);
+        if (resp.statusCode >= 300 && resp.statusCode < 400) {
+          final loc = resp.headers['location'];
+          if (loc == null || loc.isEmpty) throw StateError('Redirect without Location');
+          currentUrl = Uri.parse(currentUrl).resolve(loc).toString();
+          continue;
         }
+        throw StateError('HTTP ${resp.statusCode}');
       }
-      if (resp.statusCode != 200) throw StateError('HTTP ${resp.statusCode}');
-      return ProxyParser.parseAny(resp.body);
+      throw StateError('Too many redirects');
     } finally {
       client.close();
     }
