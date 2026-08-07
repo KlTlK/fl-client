@@ -8,9 +8,6 @@ on:
       - 'core/**'
       - '.github/workflows/build-core.yml'
 
-env:
-  SINGBOX_VERSION: v1.11.15
-
 jobs:
   build-android:
     name: Android .aar (arm64)
@@ -20,7 +17,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          cache-dependency-path: core/singbox-src/go.sum
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
@@ -30,15 +26,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Clone sing-box libbox source (pinned tag)
-        run: git clone --depth 1 --branch $SINGBOX_VERSION https://github.com/SagerNet/sing-box.git core/singbox-src
-
-      - name: Add gomobile tool dependency
-        working-directory: core/singbox-src
-        run: |
-          go get -tool golang.org/x/mobile/cmd/gobind@latest
-          go get -tool golang.org/x/mobile/cmd/gomobile@latest
-          go mod tidy
+      - name: Clone sing-box libbox source
+        run: git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src
 
       - name: Install gomobile
         run: |
@@ -70,10 +59,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          cache-dependency-path: core/singbox-src/go.sum
 
-      - name: Clone sing-box source (pinned tag)
-        run: git clone --depth 1 --branch %SINGBOX_VERSION% https://github.com/SagerNet/sing-box.git core\singbox-src
+      - name: Clone sing-box source
+        shell: bash
+        run: git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src
 
       - name: Build sing-box.exe
         working-directory: core/singbox-src
