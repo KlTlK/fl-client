@@ -1,0 +1,18 @@
+# Генерация dart:ffi биндингов из C-хедеров sing-box/libbox (OneXray-style).
+# Запуск: dart run ffigen --config ffigen.yaml
+# Это заменяет ручные lookupFunction в lib/core/singbox_ffi.dart на типобезопасный код.
+name: SingBoxNative
+description: Bindings to the compiled sing-box/libbox native library.
+output: 'lib/core/singbox_native_bindings.dart'
+headers:
+  entry-points:
+    - 'c_include/libbox.h'
+  include-directives:
+    - '**libbox.h'
+functions:
+  include:
+    - 'box_start'
+    - 'box_stop'
+    - 'box_validate'
+    - 'SetLogCallback'
+comments: false
