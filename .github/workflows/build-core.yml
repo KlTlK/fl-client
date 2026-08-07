@@ -29,6 +29,12 @@ jobs:
       - name: Clone sing-box libbox source
         run: git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src
 
+      - name: Add golang.org/x/mobile to module graph
+        working-directory: core/singbox-src
+        run: |
+          go get golang.org/x/mobile@latest
+          go mod tidy
+
       - name: Install gomobile
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
