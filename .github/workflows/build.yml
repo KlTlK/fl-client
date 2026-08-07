@@ -1,4 +1,4 @@
-name: Build Windows + Setup artifact
+name: Build Windows Setup
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - run: flutter test test/proxy_parser_test.dart test/pinger_test.dart
 
   build-windows:
-    name: Windows EXE + sing-box core
+    name: Windows Setup + Portable
     runs-on: windows-2022
     needs: parser-tests
     env:
@@ -46,27 +46,47 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
 
-      - name: Assemble setup package
+      - name: Create debug launcher (fl_client_debug.bat)
         shell: pwsh
         run: |
-          $dest = "dist\fl-client-windows"
-          New-Item -ItemType Directory -Path $dest -Force | Out-Null
-          Copy-Item -Path "build\windows\x64\runner\Release\*" -Destination $dest -Recurse -Force
-          Copy-Item -Path "libs\windows\sing-box.exe" -Destination $dest -Force
-          if (Test-Path "scripts\install.bat") { Copy-Item "scripts\install.bat" $dest -Force }
-          if (Test-Path "scripts\README-WINDOWS.txt") { Copy-Item "scripts\README-WINDOWS.txt" $dest -Force }
+          $releaseDir = "build\windows\x64\runner\Release"
+          @"
+          @echo off
+          title fl-client debug
+          echo Starting fl_client.exe from %~dp0
+          echo.
+          "%~dp0fl_client.exe" %*
+          echo.
+          echo Exit code: %errorlevel%
+          if exist "%~dp0crash.log" (
+              echo === crash.log ===
+              type "%~dp0crash.log"
+          )
+          pause
+          "@ | Out-File -FilePath "$releaseDir\fl_client_debug.bat" -Encoding ascii
 
-      - name: Zip setup package
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
         shell: pwsh
         run: |
-          Compress-Archive -Path "dist\fl-client-windows" -DestinationPath "dist\fl-client-windows.zip"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "windows\installer\fl_client.iss"
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $dest = "dist\fl-client-portable.zip"
+          New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath $dest
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fl-client-windows-setup
-          path: dist/fl-client-windows.zip
+          name: fl-client-setup-exe
+          path: Output/fl-client-setup.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-exe-raw
-          path: build/windows/x64/runner/Release/
+          name: fl-client-portable-zip
+          path: dist/fl-client-portable.zip
