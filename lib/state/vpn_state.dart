@@ -14,6 +14,38 @@ class TrafficPoint {
   TrafficPoint(this.up, this.down);
 }
 
+class Subscription {
+  final String name;
+  final String? url;
+  List<ParsedNode> nodes;
+  bool expanded;
+
+  Subscription({required this.name, this.url, this.nodes = const [], this.expanded = true});
+
+  Map<String, dynamic> toJson() => {
+    'name': name, 'url': url, 'expanded': expanded,
+    'nodes': nodes.map((n) => {
+      'name': n.name, 'protocol': n.protocol, 'host': n.host, 'port': n.port, 'raw': n.raw,
+    }).toList(),
+  };
+
+  static Subscription fromJson(Map<String, dynamic> j) => Subscription(
+    name: (j['name'] ?? '').toString(),
+    url: j['url']?.toString(),
+    expanded: j['expanded'] ?? true,
+    nodes: (j['nodes'] as List? ?? []).map((e) {
+      final m = e as Map<String, dynamic>;
+      return ParsedNode(
+        name: (m['name'] ?? '').toString(),
+        protocol: (m['protocol'] ?? '').toString(),
+        host: (m['host'] ?? '').toString(),
+        port: int.tryParse((m['port'] ?? '0').toString()) ?? 0,
+        raw: Map<String, dynamic>.from(m['raw'] as Map? ?? {}),
+      );
+    }).toList(),
+  );
+}
+
 class VpnState extends ChangeNotifier {
   final SingBoxService _sb = SingBoxService();
   final ConfigImporter _importer = ConfigImporter();
@@ -23,20 +55,25 @@ class VpnState extends ChangeNotifier {
   VpnStatus _status = VpnStatus.disconnected;
   VpnStatus get status => _status;
 
-  List<ParsedNode> _nodes = const [];
-  List<ParsedNode> get nodes => _nodes;
+  List<Subscription> _subs = [];
+  List<Subscription> get subscriptions => _subs;
 
-  int _selected = 0;
-  int get selectedIndex => _selected;
-  ParsedNode? get selectedNode => _nodes.isEmpty ? null : _nodes[_selected];
+  // Flat list of all nodes across all subs
+  List<ParsedNode> get allNodes => _subs.expand((s) => s.nodes).toList();
+
+  int _selectedGlobalIdx = 0;
+  int get selectedIndex => _selectedGlobalIdx;
+  ParsedNode? get selectedNode {
+    final all = allNodes;
+    return _selectedGlobalIdx < all.length ? all[_selectedGlobalIdx] : null;
+  }
 
   PingMethod _pingMethod = PingMethod.tcp;
   PingMethod get pingMethod => _pingMethod;
 
-  // latency по каждой ноде (индекс -> мс, null = unreachable)
   final Map<int, int?> _latencies = {};
   int? latencyFor(int i) => _latencies[i];
-  int get latency => _latencies[_selected] ?? 0;
+  int get latency => _latencies[_selectedGlobalIdx] ?? 0;
 
   final List<TrafficPoint> _traffic = [];
   List<TrafficPoint> get traffic => List.unmodifiable(_traffic);
@@ -51,32 +88,55 @@ class VpnState extends ChangeNotifier {
   Timer? _timer;
   bool _bootstrapped = false;
 
-  /// Загрузка сохранённых нод при старте. Вызывать один раз из UI (init).
   Future<void> bootstrap() async {
     if (_bootstrapped) return;
     _bootstrapped = true;
-    _nodes = await _storage.loadNodes();
-    _selected = await _storage.loadSelected();
-    if (_selected >= _nodes.length) _selected = _nodes.isEmpty ? 0 : _nodes.length - 1;
+    _subs = await _storage.loadSubscriptions();
+    _selectedGlobalIdx = await _storage.loadSelected();
+    if (_selectedGlobalIdx >= allNodes.length) _selectedGlobalIdx = 0;
     final pm = await _storage.loadPingMethod();
     _pingMethod = pm == 'http' ? PingMethod.httpGet : PingMethod.tcp;
     notifyListeners();
   }
 
-  // ---- Импорт (с автосохранением) ----
-  void importFromString(String raw) {
-    _nodes = _importer.fromString(raw);
-    _selected = 0;
-    _error = _nodes.isEmpty ? 'No supported links found' : null;
+  // --- Subscription management ---
+  Future<void> addSubscriptionFromUrl(String url) async {
+    try {
+      final nodes = await _importer.fromUrl(url);
+      if (nodes.isEmpty) { _error = 'No nodes found'; notifyListeners(); return; }
+      // Check if sub with same url exists -> update it
+      final existing = _subs.indexWhere((s) => s.url == url.trim());
+      if (existing >= 0) {
+        _subs[existing].nodes = nodes;
+        _subs[existing].expanded = true;
+      } else {
+        // Use profile-title from response or just domain as name
+        final name = Uri.parse(url).host.split('.').take(2).join('.');
+        _subs.add(Subscription(name: name, url: url.trim(), nodes: nodes));
+      }
+      _error = null;
+    } catch (e) {
+      _error = 'Fetch failed: $e';
+    }
     _persist();
     notifyListeners();
   }
 
-  Future<void> importFromClipboard() async {
+  void addSubscriptionFromString(String raw) {
+    final nodes = _importer.fromString(raw);
+    if (nodes.isEmpty) { _error = 'No supported links'; notifyListeners(); return; }
+    _subs.add(Subscription(name: 'Manual import', nodes: nodes));
+    _error = null;
+    _persist();
+    notifyListeners();
+  }
+
+  Future<void> addSubscriptionFromClipboard() async {
     try {
-      _nodes = await _importer.fromClipboard();
-      _selected = 0;
-      _error = _nodes.isEmpty ? 'Clipboard empty or no supported links' : null;
+      final nodes = await _importer.fromClipboard();
+      if (nodes.isEmpty) { _error = 'Clipboard empty'; notifyListeners(); return; }
+      _subs.add(Subscription(name: 'Clipboard', nodes: nodes));
+      _error = null;
     } catch (e) {
       _error = 'Import failed: $e';
     }
@@ -84,22 +144,24 @@ class VpnState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> importFromUrl(String url) async {
-    try {
-      _nodes = await _importer.fromUrl(url);
-      _selected = 0;
-      _error = _nodes.isEmpty ? 'Subscription returned no supported links' : null;
-    } catch (e) {
-      _error = 'Subscription fetch failed: $e';
-    }
+  void removeSubscription(int idx) {
+    if (idx < 0 || idx >= _subs.length) return;
+    _subs.removeAt(idx);
+    if (_selectedGlobalIdx >= allNodes.length) _selectedGlobalIdx = allNodes.isEmpty ? 0 : allNodes.length - 1;
     _persist();
     notifyListeners();
   }
 
-  Future<void> selectNode(int i) async {
-    if (i < 0 || i >= _nodes.length) return;
-    _selected = i;
-    await _storage.saveSelected(i);
+  void toggleSubscription(int idx) {
+    if (idx < 0 || idx >= _subs.length) return;
+    _subs[idx].expanded = !_subs[idx].expanded;
+    notifyListeners();
+  }
+
+  void selectNode(int globalIdx) {
+    if (globalIdx < 0 || globalIdx >= allNodes.length) return;
+    _selectedGlobalIdx = globalIdx;
+    _storage.saveSelected(globalIdx);
     notifyListeners();
   }
 
@@ -110,47 +172,39 @@ class VpnState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Пингует все ноды выбранным методом (tcp / http get).
   Future<void> pingAll() async {
-    for (var i = 0; i < _nodes.length; i++) {
+    final all = allNodes;
+    for (var i = 0; i < all.length; i++) {
       final idx = i;
-      final res = await _pinger.ping(_nodes[idx], method: _pingMethod);
+      final res = await _pinger.ping(all[idx], method: _pingMethod);
       _latencies[idx] = res.ms;
       notifyListeners();
     }
   }
 
   Future<void> _persist() async {
-    await _storage.saveNodes(_nodes);
-    await _storage.saveSelected(_selected);
+    await _storage.saveSubscriptions(_subs);
+    await _storage.saveSelected(_selectedGlobalIdx);
   }
 
-  // ---- Connect / disconnect ----
+  // --- Connect / disconnect ---
   Future<void> toggle() async {
     if (_status == VpnStatus.connected) await disconnect();
     else if (_status == VpnStatus.disconnected) await connect();
   }
 
   Future<void> connect() async {
-    if (_nodes.isEmpty) {
-      _error = 'Import a subscription first';
-      notifyListeners();
-      return;
-    }
-    if (!_sb.coreAvailable) {
-      _error = 'Native core not loaded: ${_sb.coreError}';
-      notifyListeners();
-      return;
-    }
+    final node = selectedNode;
+    if (node == null) { _error = 'Select a node first'; notifyListeners(); return; }
+    if (!_sb.coreAvailable) { _error = 'Core not available: ${_sb.coreError}'; notifyListeners(); return; }
     _status = VpnStatus.connecting;
     _error = null;
     notifyListeners();
     try {
-      await _sb.startNode(selectedNode!);
+      await _sb.startNode(node);
       _status = VpnStatus.connected;
       _startLoop();
     } catch (e) {
-      debugPrint('connect failed: $e');
       _error = 'Connect failed: $e';
       _status = VpnStatus.disconnected;
     }
@@ -159,15 +213,9 @@ class VpnState extends ChangeNotifier {
 
   Future<void> disconnect() async {
     _status = VpnStatus.disconnecting;
-    _timer?.cancel();
-    _timer = null;
+    _timer?.cancel(); _timer = null;
     notifyListeners();
-    try {
-      await _sb.stop(); // graceful shutdown + propagate ошибок
-    } catch (e) {
-      debugPrint('stop failed: $e');
-      _error = 'Disconnect warning: $e';
-    }
+    try { await _sb.stop(); } catch (e) { _error = 'Stop warning: $e'; }
     _status = VpnStatus.disconnected;
     _upSpeed = 0; _downSpeed = 0;
     notifyListeners();
@@ -176,7 +224,6 @@ class VpnState extends ChangeNotifier {
   void _startLoop() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      // TODO: брать реальные байты из callback'ов ядра вместо симуляции.
       _upSpeed = 20 + (_upSpeed * 0.7);
       _downSpeed = 80 + (_downSpeed * 0.7);
       _traffic.add(TrafficPoint(_upSpeed.clamp(0, 1000), _downSpeed.clamp(0, 1000)));
@@ -186,9 +233,5 @@ class VpnState extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    _importer.dispose();
-    super.dispose();
-  }
+  void dispose() { _timer?.cancel(); _importer.dispose(); super.dispose(); }
 }
