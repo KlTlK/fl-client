@@ -1,43 +1,34 @@
 @echo off
 title fl-client debug
-echo ============================================
-echo  fl-client launcher (debug mode)
-echo ============================================
-echo.
 echo Working dir: %~dp0
 echo.
 
-REM Проверяем что файлы на месте
-if not exist "%~dp0fl_client.exe" (
-    echo ERROR: fl_client.exe not found in %~dp0
-    pause
-    exit /b 1
-)
-if not exist "%~dp0flutter_windows.dll" (
-    echo ERROR: flutter_windows.dll not found!
-    pause
-    exit /b 1
-)
+REM Automatically unblock all files (bypass SmartScreen "from internet" flag)
+echo Unblocking files (SmartScreen bypass)...
+powershell -Command "Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File" 2>nul
+echo Done.
+echo.
 
 echo Starting fl_client.exe...
-echo If a window appears - great, it works!
-echo If nothing happens - check crash.log in this folder after closing.
+echo If no window appears within 10 seconds, the app is stuck.
 echo.
 
 start "" /wait "%~dp0fl_client.exe"
 
 echo.
-echo Process exited with code: %errorlevel%
+echo Exit code: %errorlevel%
 echo.
 
 if exist "%~dp0crash.log" (
-    echo === crash.log contents ===
+    echo === crash.log ===
     type "%~dp0crash.log"
-    echo ==========================
+    echo ===================
 ) else (
-    echo No crash.log found - app may have crashed before Dart initialized.
-    echo Try: right-click fl_client.exe - Properties - Unblock
-    echo Or: run as Administrator
+    echo No crash.log found.
+    echo If the process hung without a window, try:
+    echo   1. Right-click fl_client.exe - Properties - check Unblock
+    echo   2. Run this bat as Administrator
+    echo   3. Temporarily disable antivirus
 )
 
 echo.
