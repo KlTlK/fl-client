@@ -7,7 +7,7 @@ import 'screens/home_screen.dart';
 void main() {
   runApp(
     ChangeNotifierProvider(
-      create: (_) => VpnState(),
+      create: (_) => VpnState()..bootstrap(),
       child: const FlClientApp(),
     ),
   );
