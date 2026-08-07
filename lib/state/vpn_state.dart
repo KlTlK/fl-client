@@ -84,6 +84,7 @@ class VpnState extends ChangeNotifier {
   String? _error;
   String? get error => _error;
   bool get coreAvailable => _sb.coreAvailable;
+  String? get coreError => _sb.coreError;
 
   Timer? _timer;
   bool _bootstrapped = false;
