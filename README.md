@@ -1,30 +1,44 @@
 # fl-client
 
-Sing-box VPN client in FlClash style. Flutter UI + core via **dart:ffi**, full subscription parser, persistent nodes, real ping.
+Sing-box VPN client in FlClash style. **Windows-only** for now (Android -> separate repo later).
 
-## Done
-- **Subscription parser** (`lib/core/proxy_parser.dart`): vless/vmess/trojan/ss/hysteria2, base64 subs, multi-line bundles. Unit-tested.
-- **Persistent storage** (`lib/services/node_storage.dart`): imported nodes, selected node, and ping method survive app restarts (shared_preferences).
-- **Real ping** (`lib/core/pinger.dart`): two methods — **TCP connect** (raw latency) and **HTTP GET**. Switchable in the Import screen, per-node latency shown, 'Ping all' button. Tested.
-- **Graceful core shutdown** (`lib/core/singbox_ffi.dart` + `singbox_service.dart`): soft `box_shutdown(handle, timeoutMs)` then hard stop; desktop core stop failures are propagated (OneXray-style lifecycle). FFI loads softly and reports `coreAvailable`/`coreError` instead of crashing.
-- **Import flows**: from string / clipboard / HTTPS subscription URL, with node selection.
-- **CI**: parser + pinger tests on every push, plus `android-apk` and `windows-exe` artifacts.
+## What you get from Actions
+Every push builds a ready-to-run setup package in **Artifacts**:
+- **`fl-client-windows-setup`** — zip with `fl_client.exe` + `sing-box.exe` + Flutter dlls + launcher. Download, unpack, run.
+- `windows-exe-raw` — raw build output.
 
-## Architecture
+The workflow (`build.yml`) does everything in one job:
+1. Builds `sing-box.exe` from SagerNet/sing-box source (Go 1.23).
+2. Builds the Flutter Windows app.
+3. Packs both into `fl-client-windows.zip` and uploads as artifact.
+
+## How to run
+1. Download `fl-client-windows-setup` from the latest green Actions run.
+2. Unpack, double-click `fl_client.exe` (or `install.bat`).
+3. Import -> paste subscription URL/link -> Fetch -> pick node -> power button.
+> `sing-box.exe` must stay next to `fl_client.exe` (launched as a process).
+
+## Features
+- Subscription parser: vless/vmess/trojan/ss/hysteria2, base64 subs, multi-line (unit-tested).
+- Persistent nodes (survive restarts).
+- Real ping: TCP connect or HTTP GET, per-node, switchable.
+- Process-mode core on Windows (sing-box.exe), graceful stop.
+- FlClash-style animated UI (power button pulse, traffic chart, stat cards).
+
+## Structure
 - `lib/core/` — proxy_parser, singbox_outbound_builder, singbox_ffi, pinger
-- `lib/services/` — singbox_service, subscription_service, config_importer, node_storage
+- `lib/services/` — singbox_service (+ process service for Windows), subscription_service, config_importer, node_storage
 - `lib/screens/` — home_screen, import_screen
-- `lib/state/vpn_state.dart` — bootstrap (load saved), import+persist, ping (tcp/http), connect/disconnect lifecycle
-- `c_include/libbox.h` + `ffigen.yaml` — generate typed FFI via `dart run ffigen`
-- `.github/workflows/build-core.yml` — compiles libsingbox (.aar / .dll)
+- `scripts/` — install.bat, README-WINDOWS.txt (packed into the setup zip)
+- `test/` — proxy_parser_test, pinger_test (run in CI)
 
-## Build
-    # core -> libs/ (from Actions artifacts or local build)
-    # optional: dart run ffigen --config ffigen.yaml
+## Build locally
     flutter pub get
     flutter test
-    flutter run -d <device>
+    flutter build windows --release
+    # put sing-box.exe next to the produced fl_client.exe
 
-## Remaining
-- Real traffic bytes from core callbacks (the speed chart still simulates; latency is now real).
-- QR/image scan import (deferred).
+## TODO
+- Real traffic bytes from core (speed chart still simulates; latency is real).
+- Auto-update check.
+- Android in a separate repo.
