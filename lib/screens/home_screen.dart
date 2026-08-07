@@ -73,7 +73,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const TrafficChart(state: vpn),
+                TrafficChart(state: vpn),
                 const SizedBox(height: 20),
                 GridView.count(
                   shrinkWrap: true,
