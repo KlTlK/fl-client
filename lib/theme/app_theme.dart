@@ -8,14 +8,27 @@ class AppTheme {
   static const Color danger = Color(0xFFFF5C7A);
 
   static ThemeData get dark => ThemeData(
+        useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: bg,
-        colorScheme: const ColorScheme.dark(
+        colorScheme: ColorScheme.dark(
           primary: neon,
           secondary: neonAlt,
           surface: surface,
+          error: danger,
         ),
-        fontFamily: 'Roboto',
-        useMaterial3: true,
+        cardColor: surface,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: bg,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: neon,
+            foregroundColor: bg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       );
 }
