@@ -79,4 +79,7 @@ class SingBoxProcessService {
     });
     _log('Process stopped');
   }
+
+  void clearLogs() => _logs.clear();
+
 }
