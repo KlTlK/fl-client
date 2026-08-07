@@ -1,4 +1,4 @@
-name: Build Windows Setup
+name: Build Windows
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - run: flutter test test/proxy_parser_test.dart test/pinger_test.dart
 
   build-windows:
-    name: Windows Setup + Portable
+    name: Windows Build
     runs-on: windows-2022
     needs: parser-tests
     env:
@@ -41,28 +41,26 @@ jobs:
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
       - run: flutter build windows --release
+
       - name: Create debug launcher
         shell: pwsh
         run: |
           $d = "build\windows\x64\runner\Release"
-          "@echo off`r`ntitle fl-client debug`r`necho Starting...`r`n`"%~dp0fl_client.exe`" %*`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0crash.log`" type `"%~dp0crash.log`"`r`npause" | Out-File "$d\fl_client_debug.bat" -Encoding ascii
-      - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
-      - name: Build installer
+          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho Starting fl_client.exe...`r`necho.`r`nstart /wait `"`"%~dp0fl_client.exe`"`"`r`necho.`r`necho Exit code: %errorlevel%`r`necho.`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n    echo ===================`r`n) else (`r`n    echo No crash.log found.`r`n)`r`necho.`r`npause"
+          $bat | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
+
+      - name: Copy sing-box.exe to Release
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "windows\installer\fl_client.iss"
-      - name: Package portable zip
+          Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
+
+      - name: Zip everything
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist\fl-client-portable.zip"
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "dist\fl-client-windows.zip"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: fl-client-setup-exe
-          path: Output/fl-client-setup.exe
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fl-client-portable-zip
-          path: dist/fl-client-portable.zip
+          name: fl-client-windows
+          path: dist/fl-client-windows.zip
