@@ -5,24 +5,18 @@ class SubscriptionService {
   Future<List<ParsedNode>> fetch(String url) async {
     final client = http.Client();
     try {
-      var currentUrl = url.trim();
-      for (var i = 0; i < 5; i++) {
-        final req = http.Request('GET', Uri.parse(currentUrl));
-        req.headers['User-Agent'] = 'clash-verge/v1.5.0';
-        req.followRedirects = false;
-        final resp = await http.Response.fromStream(
-          await client.send(req).timeout(const Duration(seconds: 15)),
-        );
-        if (resp.statusCode == 200) return ProxyParser.parseAny(resp.body);
-        if (resp.statusCode >= 300 && resp.statusCode < 400) {
-          final loc = resp.headers['location'];
-          if (loc == null || loc.isEmpty) throw StateError('Redirect without Location');
-          currentUrl = Uri.parse(currentUrl).resolve(loc).toString();
-          continue;
-        }
-        throw StateError('HTTP ${resp.statusCode}');
-      }
-      throw StateError('Too many redirects');
+      final resp = await client.get(
+        Uri.parse(url.trim()),
+        headers: {
+          'User-Agent': 'v2rayN/6.23',
+          'Accept': '*/*',
+          'Accept-Encoding': 'identity',
+        },
+      ).timeout(const Duration(seconds: 20));
+      if (resp.statusCode != 200) throw StateError('HTTP ${resp.statusCode}');
+      final nodes = ProxyParser.parseAny(resp.body);
+      if (nodes.isEmpty) throw StateError('No supported links in response (${resp.body.length} bytes)');
+      return nodes;
     } finally {
       client.close();
     }
