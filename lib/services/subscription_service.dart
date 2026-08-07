@@ -13,11 +13,10 @@ class SubscriptionService {
         throw StateError('subscription HTTP ${resp.statusCode}');
       }
       return ProxyParser.parseAny(resp.body);
-    } on http.ClientException catch (e) {
-      // Redirect loop - try with the redirect URL from the error
-      throw StateError('Fetch failed: $e');
     } finally {
       client.close();
     }
   }
+
+  void dispose() {}
 }
