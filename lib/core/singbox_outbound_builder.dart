@@ -1,47 +1,32 @@
 import 'dart:convert';
 import 'proxy_parser.dart';
 
-/// Превращает [ParsedNode] в sing-box outbound. Поддерживает всё что парсит ProxyParser:
-/// vless (+reality/xtls), vmess, trojan, shadowsocks, hysteria2.
 class SingBoxOutboundBuilder {
   static Map<String, dynamic> build(ParsedNode n) {
     switch (n.protocol) {
-      case 'vless':
-        return _vless(n);
-      case 'vmess':
-        return _vmess(n);
-      case 'trojan':
-        return _trojan(n);
-      case 'ss':
-        return _shadowsocks(n);
-      case 'hysteria2':
-        return _hysteria2(n);
-      default:
-        throw ArgumentError('unsupported protocol: ${n.protocol}');
+      case 'vless': return _vless(n);
+      case 'vmess': return _vmess(n);
+      case 'trojan': return _trojan(n);
+      case 'ss': return _shadowsocks(n);
+      case 'hysteria2': return _hysteria2(n);
+      default: throw ArgumentError('unsupported: ${n.protocol}');
     }
   }
 
   static Map<String, dynamic> _vless(ParsedNode n) {
-    final security = (n.raw['security'] ?? '').toString();
+    final sec = (n.raw['security'] ?? '').toString();
     return {
-      'type': 'vless',
-      'tag': n.name,
-      'server': n.host,
-      'server_port': n.port,
+      'type': 'vless', 'tag': n.name, 'server': n.host, 'server_port': n.port,
       'uuid': (n.raw['uuid'] ?? '').toString(),
       'flow': (n.raw['flow'] ?? '').toString(),
-      if (security.isNotEmpty)
-        'tls': _tls(n, reality: security == 'reality'),
+      if (sec.isNotEmpty) 'tls': _tls(n, reality: sec == 'reality'),
     };
   }
 
   static Map<String, dynamic> _vmess(ParsedNode n) {
     final tls = (n.raw['tls'] ?? '').toString() == 'tls';
     return {
-      'type': 'vmess',
-      'tag': n.name,
-      'server': n.host,
-      'server_port': n.port,
+      'type': 'vmess', 'tag': n.name, 'server': n.host, 'server_port': n.port,
       'uuid': (n.raw['id'] ?? '').toString(),
       'security': (n.raw['scy'] ?? 'auto').toString(),
       'alter_id': int.tryParse((n.raw['aid'] ?? '0').toString()) ?? 0,
@@ -49,74 +34,47 @@ class SingBoxOutboundBuilder {
     };
   }
 
-  static Map<String, dynamic> _trojan(ParsedNode n) {
-    return {
-      'type': 'trojan',
-      'tag': n.name,
-      'server': n.host,
-      'server_port': n.port,
-      'password': (n.raw['password'] ?? '').toString(),
-      'tls': _tls(n),
-    };
-  }
+  static Map<String, dynamic> _trojan(ParsedNode n) => {
+    'type': 'trojan', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'password': (n.raw['password'] ?? '').toString(), 'tls': _tls(n),
+  };
 
-  static Map<String, dynamic> _shadowsocks(ParsedNode n) {
-    return {
-      'type': 'shadowsocks',
-      'tag': n.name,
-      'server': n.host,
-      'server_port': n.port,
-      'method': (n.raw['method'] ?? 'aes-128-gcm').toString(),
-      'password': (n.raw['password'] ?? '').toString(),
-    };
-  }
+  static Map<String, dynamic> _shadowsocks(ParsedNode n) => {
+    'type': 'shadowsocks', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'method': (n.raw['method'] ?? 'aes-128-gcm').toString(),
+    'password': (n.raw['password'] ?? '').toString(),
+  };
 
-  static Map<String, dynamic> _hysteria2(ParsedNode n) {
-    return {
-      'type': 'hysteria2',
-      'tag': n.name,
-      'server': n.host,
-      'server_port': n.port,
-      'password': (n.raw['password'] ?? '').toString(),
-      'tls': _tls(n),
-    };
-  }
+  static Map<String, dynamic> _hysteria2(ParsedNode n) => {
+    'type': 'hysteria2', 'tag': n.name, 'server': n.host, 'server_port': n.port,
+    'password': (n.raw['password'] ?? '').toString(), 'tls': _tls(n),
+  };
 
   static Map<String, dynamic> _tls(ParsedNode n, {bool reality = false}) {
     final sni = (n.raw['sni'] ?? n.host).toString();
     final fp = (n.raw['fp'] ?? 'chrome').toString();
     return {
-      'enabled': true,
-      'server_name': sni,
+      'enabled': true, 'server_name': sni,
       'utls': {'enabled': true, 'fingerprint': fp},
-      if (reality)
-        'reality': {
-          'enabled': true,
-          'public_key': (n.raw['pbk'] ?? '').toString(),
-          'short_id': (n.raw['sid'] ?? '').toString(),
-        },
+      if (reality) 'reality': {
+        'enabled': true,
+        'public_key': (n.raw['pbk'] ?? '').toString(),
+        'short_id': (n.raw['sid'] ?? '').toString(),
+      },
     };
   }
 
-  /// Полный sing-box config: tun inbound + один outbound из узла.
   static String buildFullConfig(ParsedNode n) {
     return jsonEncode({
-      'log': {'level': 'warn'},
-      'inbounds': [
-        {
-          'type': 'tun',
-          'tag': 'tun-in',
-          'inet4_address': '172.19.0.1/30',
-          'auto_route': true,
-          'strict_route': true,
-          'stack': 'system',
-        }
-      ],
-      'outbounds': [
-        build(n),
-        {'type': 'direct', 'tag': 'direct'},
-        {'type': 'block', 'tag': 'block'},
-      ],
+      'log': {'level': 'info'},
+      'inbounds': [{
+        'type': 'tun', 'tag': 'tun-in',
+        'inet4_address': '172.19.0.1/30',
+        'auto_route': true,
+        'strict_route': true,
+        'stack': 'gvisor',
+      }],
+      'outbounds': [build(n), {'type': 'direct', 'tag': 'direct'}, {'type': 'block', 'tag': 'block'}],
       'route': {
         'rules': [{'ip_is_private': true, 'outbound': 'direct'}],
         'final': 'proxy',
