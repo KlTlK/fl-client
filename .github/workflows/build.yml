@@ -42,17 +42,50 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
 
-      - name: Create debug launcher
+      - name: Copy VC++ runtime DLLs next to exe
         shell: pwsh
         run: |
-          $d = "build\windows\x64\runner\Release"
-          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho Starting fl_client.exe...`r`necho.`r`nstart /wait `"`"%~dp0fl_client.exe`"`"`r`necho.`r`necho Exit code: %errorlevel%`r`necho.`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n    echo ===================`r`n) else (`r`n    echo No crash.log found.`r`n)`r`necho.`r`npause"
-          $bat | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
+          $releaseDir = "build\windows\x64\runner\Release"
+          # Find VC++ runtime DLLs from the VS installation
+          $vcrtPaths = @(
+            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC",
+            "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC",
+            "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
+          )
+          $found = $false
+          foreach ($base in $vcrtPaths) {
+            if (Test-Path $base) {
+              $dlls = Get-ChildItem -Path $base -Recurse -Filter "vcruntime140.dll" | Where-Object { $_.DirectoryName -match "x64" } | Select-Object -First 1
+              if ($dlls) {
+                $dir = $dlls.DirectoryName
+                Copy-Item "$dir\vcruntime140.dll" "$releaseDir\" -Force
+                Copy-Item "$dir\vcruntime140_1.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
+                Copy-Item "$dir\msvcp140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
+                Write-Output "Copied VC++ runtime from $dir"
+                $found = $true
+                break
+              }
+            }
+          }
+          if (-not $found) {
+            # Fallback: try system32
+            Copy-Item "C:\Windows\System32\vcruntime140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
+            Copy-Item "C:\Windows\System32\vcruntime140_1.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
+            Copy-Item "C:\Windows\System32\msvcp140.dll" "$releaseDir\" -Force -ErrorAction SilentlyContinue
+            Write-Output "Copied VC++ runtime from System32 (fallback)"
+          }
 
       - name: Copy sing-box.exe to Release
         shell: pwsh
         run: |
           Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
+
+      - name: Create debug launcher
+        shell: pwsh
+        run: |
+          $d = "build\windows\x64\runner\Release"
+          $bat = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`necho.`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`necho.`r`n`"%~dp0fl_client.exe`"`r`necho.`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0crash.log`" (`r`n    echo === crash.log ===`r`n    type `"%~dp0crash.log`"`r`n)`r`npause"
+          $bat | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
 
       - name: Zip everything
         shell: pwsh
