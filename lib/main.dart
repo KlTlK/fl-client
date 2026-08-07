@@ -1,52 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'theme/app_theme.dart';
-import 'state/vpn_state.dart';
-import 'screens/home_screen.dart';
 
-void main() async {
-  // Ловим все ошибки и пишем в файл рядом с exe чтоб можно было дебажить
-  FlutterError.onError = (details) {
-    _logError('FlutterError: ${details.exception}\n${details.stack}');
-    FlutterError.presentError(details);
-  };
-
-  try {
-    runApp(
-      ChangeNotifierProvider(
-        create: (_) => VpnState(),
-        child: const FlClientApp(),
-      ),
-    );
-  } catch (e, st) {
-    _logError('FATAL: $e\n$st');
-    // Fallback: покажем ошибку в нативном диалоге если Flutter не стартанул
-    stderr.writeln('FATAL: $e');
-    exitCode = 1;
-  }
-}
-
-void _logError(String msg) {
+void main() {
+  // Write a file immediately to prove Dart is running
   try {
     final exeDir = File(Platform.resolvedExecutable).parent.path;
-    File('$exeDir${Platform.pathSeparator}crash.log').writeAsStringSync(
-      '${DateTime.now()}\n$msg\n---\n',
-      mode: FileMode.append,
-    );
+    File('$exeDir\\dart_alive.txt').writeAsStringSync('Dart main() executed at ${DateTime.now()}');
   } catch (_) {}
-}
 
-class FlClientApp extends StatelessWidget {
-  const FlClientApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'fl-client',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: const HomeScreen(),
-    );
-  }
+  runApp(const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: Scaffold(
+      backgroundColor: Color(0xFF0E1117),
+      body: Center(
+        child: Text('fl-client is alive!', style: TextStyle(color: Color(0xFF3DF5C8), fontSize: 24)),
+      ),
+    ),
+  ));
 }
