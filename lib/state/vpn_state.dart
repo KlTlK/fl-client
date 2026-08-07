@@ -234,4 +234,10 @@ class VpnState extends ChangeNotifier {
 
   @override
   void dispose() { _timer?.cancel(); _importer.dispose(); super.dispose(); }
+
+  // --- Logs ---
+  List<String> get logLines => _sb.processLogs;
+  void clearLogs() => _sb.clearLogs();
+  void clearError() { _error = null; notifyListeners(); }
+
 }
