@@ -4,8 +4,6 @@ import 'dart:io';
 import '../core/proxy_parser.dart';
 import '../core/singbox_outbound_builder.dart';
 
-/// Windows: запускаем готовый sing-box.exe как процесс (flux-vpn / XrayUI подход).
-/// sing-box.exe лежит либо в libs/windows/ (dev), либо рядом с fl_client.exe (dist).
 class SingBoxProcessService {
   Process? _proc;
   bool get running => _proc != null;
@@ -13,39 +11,72 @@ class SingBoxProcessService {
   List<String> get logs => List.unmodifiable(_logs);
 
   String _exePath() {
-    // 1) Рядом с исполняемым файлом (dist-сборка)
-    final exeDir = Platform.resolvedExecutable;
-    final nextToExe = File('${File(exeDir).parent.path}${Platform.pathSeparator}sing-box.exe');
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    final nextToExe = File('$exeDir${Platform.pathSeparator}sing-box.exe');
     if (nextToExe.existsSync()) return nextToExe.path;
-    // 2) libs/windows/ (dev / repo layout)
     const dev = 'libs/windows/sing-box.exe';
     if (File(dev).existsSync()) return dev;
-    // 3) working dir
     if (File('sing-box.exe').existsSync()) return 'sing-box.exe';
-    return nextToExe.path; // fallback
+    return nextToExe.path;
+  }
+
+  void _log(String msg) {
+    _logs.add('[${DateTime.now().toIso8601String()}] $msg');
+    if (_logs.length > 500) _logs.removeAt(0);
+    // Write to file
+    try {
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      File('$exeDir${Platform.pathSeparator}singbox.log').writeAsStringSync(
+        _logs.join('\n'), mode: FileMode.writeOnly,
+      );
+    } catch (_) {}
   }
 
   Future<void> start(ParsedNode node) async {
     final config = SingBoxOutboundBuilder.buildFullConfig(node);
-    final tmp = await File('${Directory.systemTemp.path}/fl_client_singbox.json').writeAsString(config);
+    final tmp = await File('${Directory.systemTemp.path}${Platform.pathSeparator}fl_client_singbox.json').writeAsString(config);
+    _log('Config written to ${tmp.path}');
+    _log('Config: $config');
+    
     final exe = _exePath();
+    _log('sing-box path: $exe (exists: ${File(exe).existsSync()})');
+    
     if (!File(exe).existsSync()) {
-      throw StateError('sing-box.exe not found at $exe — run scripts/fetch_sing_box.ps1 or place it next to the app');
+      throw StateError('sing-box.exe not found at $exe');
     }
+    
+    _log('Starting: $exe run -c ${tmp.path}');
     _proc = await Process.start(exe, ['run', '-c', tmp.path, '--disable-color']);
-    _proc!.stdout.transform(utf8.decoder).listen((l) => _logs.add(l));
-    _proc!.stderr.transform(utf8.decoder).listen((l) => _logs.add('[err] $l'));
-    await Future.delayed(const Duration(milliseconds: 800));
+    _log('Process started, pid: ${_proc!.pid}');
+    
+    _proc!.stdout.transform(utf8.decoder).listen((l) {
+      for (final line in l.split('\n')) {
+        if (line.trim().isNotEmpty) _log('stdout: $line');
+      }
+    });
+    _proc!.stderr.transform(utf8.decoder).listen((l) {
+      for (final line in l.split('\n')) {
+        if (line.trim().isNotEmpty) _log('stderr: $line');
+      }
+    });
+    _proc!.exitCode.then((code) => _log('Process exited with code: $code'));
+    
+    await Future.delayed(const Duration(seconds: 2));
+    if (_logs.any((l) => l.contains('exited with code'))) {
+      throw StateError('sing-box crashed immediately. Check singbox.log');
+    }
   }
 
   Future<void> stop() async {
     final p = _proc;
     if (p == null) return;
     _proc = null;
+    _log('Stopping process...');
     p.kill(ProcessSignal.sigterm);
     await p.exitCode.timeout(const Duration(seconds: 3), onTimeout: () {
       p.kill(ProcessSignal.sigkill);
       return -1;
     });
+    _log('Process stopped');
   }
 }
