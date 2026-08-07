@@ -10,18 +10,14 @@ on:
 
 jobs:
   build-android:
-    name: Android .aar / .so (arm64)
+    name: Android .aar (arm64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Setup Android NDK + JDK
-        uses: nttld/setup-ndk@v1
+      - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r26b
@@ -30,7 +26,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install gomobile (hiddify fork)
+      - name: Clone sing-box libbox source
+        run: git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src
+
+      - name: Add gomobile tool dependency
+        working-directory: core/singbox-src
+        run: |
+          go get -tool golang.org/x/mobile/cmd/gobind@latest
+          go get -tool golang.org/x/mobile/cmd/gomobile@latest
+          go mod tidy
+
+      - name: Install gomobile
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
@@ -39,16 +45,12 @@ jobs:
       - name: Init gomobile
         run: gomobile init
 
-      - name: Clone sing-box libbox source
-        run: |
-          git clone --depth 1 https://github.com/SagerNet/sing-box.git core/singbox-src || true
-
       - name: Build libbox.aar (arm64-v8a)
+        working-directory: core/singbox-src
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          mkdir -p libs/android
-          cd core/singbox-src
+          mkdir -p ../../libs/android
           gomobile bind -v -androidapi 21 -target=android/arm64 -o ../../libs/android/libbox.aar ./experimental/libbox
 
       - uses: actions/upload-artifact@v4
@@ -57,31 +59,29 @@ jobs:
           path: libs/android/libbox.aar
 
   build-windows:
-    name: Windows .dll (x64)
+    name: Windows sing-box.exe (x64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
 
       - name: Clone sing-box source
         run: git clone --depth 1 https://github.com/SagerNet/sing-box.git core\singbox-src
 
-      - name: Build libsingbox.dll (cgo shared)
+      - name: Build sing-box.exe
+        working-directory: core/singbox-src
         shell: bash
         env:
           GOOS: windows
           GOARCH: amd64
-          CGO_ENABLED: '1'
+          CGO_ENABLED: '0'
         run: |
-          mkdir -p libs/windows
-          cd core/singbox-src
-          go build -buildmode=c-shared -o ../../libs/windows/libsingbox.dll ./experimental/libbox
+          mkdir -p ../../libs/windows
+          go build -trimpath -ldflags "-s -w -buildid=" -o ../../libs/windows/sing-box.exe ./cmd/sing-box
 
       - uses: actions/upload-artifact@v4
         with:
-          name: libsingbox-windows-dll
-          path: libs/windows/libsingbox.dll
+          name: singbox-windows-exe
+          path: libs/windows/sing-box.exe
