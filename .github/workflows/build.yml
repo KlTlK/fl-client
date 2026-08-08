@@ -40,34 +40,73 @@ jobs:
           cmake-version: '3.22.x'
       - run: flutter config --enable-windows-desktop
       - run: flutter pub get
-      - name: Build (capture errors)
+
+      - name: Analyze (non-blocking)
+        shell: pwsh
+        run: |
+          $output = flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | Out-String
+          $output | Out-File "analyze_output.txt" -Encoding utf8
+          Write-Output $output
+
+      - name: Build
         shell: pwsh
         run: |
           $output = flutter build windows --release 2>&1 | Out-String
-          $output | Out-File "build_errors.txt" -Encoding utf8
+          $output | Out-File "build_output.txt" -Encoding utf8
           Write-Output $output
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Copy VC++ runtime DLLs
         shell: pwsh
         run: |
           $d = "build\windows\x64\runner\Release"
           @("C:\Windows\System32\vcruntime140.dll","C:\Windows\System32\vcruntime140_1.dll","C:\Windows\System32\msvcp140.dll") | ForEach-Object { if (Test-Path $_) { Copy-Item $_ "$d\" -Force } }
+
       - name: Copy sing-box.exe
         shell: pwsh
         run: Copy-Item "libs\windows\sing-box.exe" "build\windows\x64\runner\Release\" -Force
-      - name: Create debug launcher
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer (.exe)
         shell: pwsh
+        continue-on-error: true
         run: |
-          $d = "build\windows\x64\runner\Release"
-          $b = "@echo off`r`ntitle fl-client debug`r`necho Working dir: %~dp0`r`npowershell -Command `"Get-ChildItem -Path '%~dp0' -Recurse | Unblock-File`" 2>nul`r`necho Unblocked. Starting...`r`n`"%~dp0fl_client.exe`"`r`necho Exit code: %errorlevel%`r`nif exist `"%~dp0dart_alive.txt`" (echo Dart ran! & type `"%~dp0dart_alive.txt`")`r`nif exist `"%~dp0crash.log`" (echo === crash.log === & type `"%~dp0crash.log`")`r`npause"
-          $b | Out-File "$d\DEBUG_RUN_ME.bat" -Encoding ascii
+          New-Item -ItemType Directory -Path Output -Force | Out-Null
+          # Find ISCC
+          $iscc = $null
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          )
+          foreach ($c in $candidates) { if (Test-Path $c) { $iscc = $c; break } }
+          if (-not $iscc) {
+            $found = Get-Command ISCC -ErrorAction SilentlyContinue
+            if ($found) { $iscc = $found.Source }
+          }
+          if (-not $iscc) { Write-Output "ISCC not found! Skipping installer."; exit 0 }
+          Write-Output "Using ISCC: $iscc"
+          & $iscc "windows\installer\fl_client.iss" 2>&1 | Tee-Object -FilePath "inno_output.txt"
+          if ($LASTEXITCODE -ne 0) { Write-Output "ISCC failed with code $LASTEXITCODE" }
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-errors
-          path: build_errors.txt
+          name: build-logs
+          path: |
+            analyze_output.txt
+            build_output.txt
+            inno_output.txt
+
       - uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: fl-client-windows
           path: build/windows/x64/runner/Release/
+
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('Output/fl-client-setup.exe') != ''
+        with:
+          name: fl-client-setup-exe
+          path: Output/fl-client-setup.exe
