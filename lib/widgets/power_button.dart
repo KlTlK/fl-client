@@ -17,7 +17,7 @@ class PowerButton extends StatelessWidget {
         state.status == VpnStatus.disconnecting;
     final color = connected
         ? AppTheme.accent
-        : (busy ? AppTheme.accentAlt : AppTheme.danger);
+        : (busy ? AppTheme.accentSoft : AppTheme.danger);
 
     return GestureDetector(
       onTap: busy ? null : onTap,
