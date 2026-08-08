@@ -67,16 +67,6 @@ class SingBoxOutboundBuilder {
   static String buildFullConfig(ParsedNode n) {
     return jsonEncode({
       'log': {'level': 'info'},
-      'dns': {
-        'servers': [
-          {'tag': 'dns-direct', 'address': '8.8.8.8', 'detour': 'direct'},
-          {'tag': 'dns-proxy', 'address': '1.1.1.1', 'detour': 'proxy'},
-        ],
-        'rules': [
-          {'outbound': 'any', 'server': 'dns-direct'},
-        ],
-        'strategy': 'ipv4_only',
-      },
       'inbounds': [{
         'type': 'tun', 'tag': 'tun-in',
         'address': ['172.19.0.1/30'],
@@ -94,7 +84,6 @@ class SingBoxOutboundBuilder {
         'rules': [
           {'ip_is_private': true, 'outbound': 'direct'},
           {'protocol': 'dns', 'outbound': 'dns-out'},
-          {'domain_suffix': ['rutube.ru'], 'outbound': 'direct'},
         ],
         'final': 'proxy',
         'auto_detect_interface': true,
