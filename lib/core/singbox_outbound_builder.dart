@@ -78,12 +78,11 @@ class SingBoxOutboundBuilder {
         build(n),
         {'type': 'direct', 'tag': 'direct'},
         {'type': 'block', 'tag': 'block'},
-        {'type': 'dns', 'tag': 'dns-out'},
       ],
       'route': {
         'rules': [
           {'ip_is_private': true, 'outbound': 'direct'},
-          {'protocol': 'dns', 'outbound': 'dns-out'},
+          {'action': 'hijack-dns', 'protocol': 'dns'},
         ],
         'final': 'proxy',
         'auto_detect_interface': true,
