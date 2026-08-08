@@ -1,68 +1,50 @@
 import 'dart:convert';
-import 'package:dio/dio.dart';
-import 'package:cookie_jar/cookie_jar.dart';
-import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'dart:io';
 import '../core/proxy_parser.dart';
 
 class SubscriptionService {
-  final _cookieJar = CookieJar();
-  late final Dio _dio;
-
-  SubscriptionService() {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 20),
-      followRedirects: true,
-      maxRedirects: 10,
-      validateStatus: (status) => status != null && status < 500,
-    ));
-    _dio.interceptors.add(CookieManager(_cookieJar));
-  }
-
-  String _fixBase64Padding(String input) {
-    input = input.trim();
-    switch (input.length % 4) {
-      case 2: return input + '==';
-      case 3: return input + '=';
-      default: return input;
-    }
-  }
-
   Future<List<ParsedNode>> fetch(String url) async {
-    final response = await _dio.get(
-      url.trim(),
-      options: Options(
-        headers: {
-          'User-Agent': 'v2rayN/6.23',
-          'Accept': '*/*',
-        },
-        responseType: ResponseType.plain,
-      ),
-    );
+    // Используем системный curl - он правильно handling куки + TLS fingerprint
+    final tmpCookie = '${Directory.systemTemp.path}${Platform.pathSeparator}fl_sub_cookies.txt';
+    final tmpOut = '${Directory.systemTemp.path}${Platform.pathSeparator}fl_sub_response.txt';
 
-    if (response.statusCode != 200) {
-      throw StateError('HTTP ${response.statusCode}');
+    // Удаляем старые файлы
+    try { File(tmpCookie).deleteSync(); } catch (_) {}
+    try { File(tmpOut).deleteSync(); } catch (_) {}
+
+    final result = await Process.run('curl', [
+      '-L',                    // follow redirects
+      '-s',                    // silent
+      '-S',                    // show errors
+      '--max-redirs', '10',
+      '-c', tmpCookie,         // save cookies
+      '-b', tmpCookie,         // send cookies
+      '-A', 'v2rayN/6.23',    // user agent
+      '-o', tmpOut,            // output to file
+      '--connect-timeout', '15',
+      '--max-time', '30',
+      url.trim(),
+    ]);
+
+    if (result.exitCode != 0) {
+      throw StateError('curl failed (exit ${result.exitCode}): ${result.stderr.toString().trim()}');
     }
 
-    var body = response.data.toString().trim();
-    if (body.isEmpty) throw StateError('Empty response');
+    final file = File(tmpOut);
+    if (!file.existsSync() || file.lengthSync() == 0) {
+      throw StateError('Empty response from server');
+    }
 
-    // Try direct parse first
-    var nodes = ProxyParser.parseAny(body);
-    if (nodes.isNotEmpty) return nodes;
+    final body = file.readAsStringSync().trim();
 
-    // Try base64 decode with padding fix
-    final padded = _fixBase64Padding(body);
-    try {
-      final decoded = utf8.decode(base64Decode(padded));
-      nodes = ProxyParser.parseAny(decoded);
-      if (nodes.isNotEmpty) return nodes;
-    } catch (_) {}
+    // Cleanup
+    try { File(tmpCookie).deleteSync(); } catch (_) {}
+    try { File(tmpOut).deleteSync(); } catch (_) {}
 
-    throw StateError('No supported links found (${body.length} bytes)');
+    final nodes = ProxyParser.parseAny(body);
+    if (nodes.isEmpty) throw StateError('No supported links (${body.length} bytes)');
+    return nodes;
   }
 
-  void dispose() {
-    _cookieJar.deleteAll();
-  }
+  void dispose() {}
 }
