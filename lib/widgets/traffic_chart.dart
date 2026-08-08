@@ -39,23 +39,23 @@ class TrafficChart extends StatelessWidget {
               LineChartBarData(
                 spots: spotsDown,
                 isCurved: true,
-                color: AppTheme.neonAlt,
+                color: AppTheme.accentAlt,
                 barWidth: 3,
                 dotData: const FlDotData(show: false),
                 belowBarData: BarAreaData(
                   show: true,
-                  color: AppTheme.neonAlt.withOpacity(0.18),
+                  color: AppTheme.accentAlt.withOpacity(0.18),
                 ),
               ),
               LineChartBarData(
                 spots: spotsUp,
                 isCurved: true,
-                color: AppTheme.neon,
+                color: AppTheme.accent,
                 barWidth: 3,
                 dotData: const FlDotData(show: false),
                 belowBarData: BarAreaData(
                   show: true,
-                  color: AppTheme.neon.withOpacity(0.18),
+                  color: AppTheme.accent.withOpacity(0.18),
                 ),
               ),
             ],
