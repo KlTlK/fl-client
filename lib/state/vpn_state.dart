@@ -189,9 +189,23 @@ class VpnState extends ChangeNotifier {
   }
 
   // --- Connect / disconnect ---
+  bool _busy = false;
+  bool get busy => _busy;
+
   Future<void> toggle() async {
-    if (_status == VpnStatus.connected) await disconnect();
-    else if (_status == VpnStatus.disconnected) await connect();
+    if (_busy) return;
+    _busy = true;
+    notifyListeners();
+    try {
+      if (_status == VpnStatus.connected || _status == VpnStatus.disconnecting) {
+        await disconnect();
+      } else if (_status == VpnStatus.disconnected) {
+        await connect();
+      }
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
   }
 
   Future<void> connect() async {
