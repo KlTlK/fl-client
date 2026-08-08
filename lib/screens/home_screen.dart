@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../state/vpn_state.dart';
@@ -55,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
             // Power button + status
             Expanded(flex: 2, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              AnimatedBuilder(animation: _pulseAnim, builder: (_, __) {
+              AnimatedBuilder(animation: _pulseAnim, builder: (BuildContext _, Widget? __) {
                 return Transform.scale(scale: connected ? _pulseAnim.value : 1.0,
                   child: GestureDetector(onTap: vpn.busy ? null : vpn.toggle,
                     child: AnimatedContainer(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic,
