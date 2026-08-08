@@ -6,10 +6,10 @@ import '../core/singbox_outbound_builder.dart';
 
 class SingBoxProcessService {
   Process? _proc;
-  bool get running => _proc != null;
+  int? _pid;
+  bool get running => _pid != null;
   final List<String> _logs = [];
   List<String> get logs => List.unmodifiable(_logs);
-
   void clearLogs() => _logs.clear();
 
   String _exePath() {
@@ -36,60 +36,69 @@ class SingBoxProcessService {
     final config = SingBoxOutboundBuilder.buildFullConfig(node);
     final tmpPath = '${Directory.systemTemp.path}${Platform.pathSeparator}fl_client_singbox.json';
     await File(tmpPath).writeAsString(config);
-    _log('Config: $config');
+    _log('Config written');
 
     final exe = _exePath();
     _log('sing-box: $exe (exists: ${File(exe).existsSync()})');
     if (!File(exe).existsSync()) throw StateError('sing-box.exe not found at $exe');
 
-    // Launch elevated via PowerShell Start-Process -Verb RunAs
-    // This triggers UAC prompt and runs sing-box as admin
+    // Launch elevated
     final psCmd = 'Start-Process -FilePath "$exe" -ArgumentList "run","-c","$tmpPath","--disable-color" -Verb RunAs -PassThru -WindowStyle Hidden | Select-Object -ExpandProperty Id';
-    _log('Elevating: $psCmd');
+    _log('Elevating sing-box...');
 
     final result = await Process.run('powershell', ['-Command', psCmd]);
-    _log('PowerShell stdout: ${result.stdout.toString().trim()}');
-    _log('PowerShell stderr: ${result.stderr.toString().trim()}');
+    _log('PS stdout: ${result.stdout.toString().trim()}');
+    if (result.stderr.toString().trim().isNotEmpty) _log('PS stderr: ${result.stderr.toString().trim()}');
 
-    if (result.exitCode != 0) {
-      throw StateError('Failed to elevate sing-box: ${result.stderr}');
-    }
+    if (result.exitCode != 0) throw StateError('Elevation failed: ${result.stderr}');
 
-    final pidStr = result.stdout.toString().trim();
-    final pid = int.tryParse(pidStr);
-    if (pid == null || pid <= 0) {
-      throw StateError('Failed to get sing-box PID (got: "$pidStr"). UAC denied?');
-    }
+    final pid = int.tryParse(result.stdout.toString().trim());
+    if (pid == null || pid <= 0) throw StateError('No PID returned. UAC denied?');
 
-    _log('sing-box started with PID: $pid (elevated)');
-
-    // Store PID for later kill
     _pid = pid;
+    _log('sing-box PID: $pid (elevated)');
 
-    // Wait a bit and check if process is still alive
-    await Future.delayed(const Duration(seconds: 2));
-    final checkResult = await Process.run('powershell', [
-      '-Command', 'Get-Process -Id $pid -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id'
+    await Future.delayed(const Duration(seconds: 3));
+
+    // Check if still alive
+    final check = await Process.run('powershell', [
+      '-Command', '(Get-Process -Id $pid -ErrorAction SilentlyContinue) -ne \$null'
     ]);
-    if (checkResult.stdout.toString().trim().isEmpty) {
-      // Process died - read log file for error
-      final logFile = File('$tmpPath.log');
-      String extra = '';
-      if (logFile.existsSync()) extra = logFile.readAsStringSync();
-      throw StateError('sing-box crashed after elevation. Check singbox.log. $extra');
+    if (check.stdout.toString().trim() != 'True') {
+      _pid = null;
+      throw StateError('sing-box crashed after start. Check singbox.log');
     }
-
-    _log('sing-box is running (PID $pid confirmed)');
+    _log('sing-box running OK');
   }
-
-  int? _pid;
 
   Future<void> stop() async {
     final pid = _pid;
     if (pid == null) return;
+    _log('Stopping sing-box PID: $pid (graceful)...');
+
+    // Graceful: send CTRL+C equivalent via taskkill without /F first
+    await Process.run('taskkill', ['/PID', '$pid']);
+    
+    // Wait for graceful shutdown (sing-box cleans up TUN routes on SIGTERM)
+    await Future.delayed(const Duration(seconds: 3));
+
+    // Check if still alive, force kill if needed
+    final check = await Process.run('powershell', [
+      '-Command', '(Get-Process -Id $pid -ErrorAction SilentlyContinue) -ne \$null'
+    ]);
+    if (check.stdout.toString().trim() == 'True') {
+      _log('Force killing...');
+      await Process.run('taskkill', ['/PID', '$pid', '/F']);
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    // Restore default route just in case
+    await Process.run('powershell', [
+      '-Command', 'Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | ForEach-Object { Remove-NetRoute -InterfaceIndex \$_.InterfaceIndex -DestinationPrefix "0.0.0.0/0" -Confirm:\$false -ErrorAction SilentlyContinue }; Get-NetIPInterface -AddressFamily IPv4 | Where-Object { \$_.ConnectionState -eq "Connected" } | ForEach-Object { New-NetRoute -InterfaceIndex \$_.InterfaceIndex -DestinationPrefix "0.0.0.0/0" -NextHop (Get-NetIPConfiguration -InterfaceIndex \$_.InterfaceIndex | Select-Object -ExpandProperty IPv4DefaultGateway | Select-Object -ExpandProperty NextHop) -ErrorAction SilentlyContinue }'
+    ]);
+    _log('Routes restored');
+
     _pid = null;
-    _log('Stopping sing-box PID: $pid');
-    await Process.run('taskkill', ['/PID', '$pid', '/F']);
     _log('Stopped');
   }
 }
