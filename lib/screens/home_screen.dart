@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle, color: AppTheme.card,
             border: Border.all(color: connected ? AppTheme.success.withOpacity(0.5) : AppTheme.surface, width: 3),
-            boxShadow: [BoxShadow(color: (connected ? AppTheme.success : AppTheme.accent).withOpacity(0.15), blurRadius: 40, spreadRadius: 10)],
+            
           ),
           child: Icon(Icons.power_settings_new_rounded, size: 80, color: connected ? AppTheme.success : AppTheme.textSecondary),
         ),
