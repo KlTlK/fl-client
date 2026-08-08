@@ -11,17 +11,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>  {
   final _urlCtrl = TextEditingController();
-  late AnimationController _pulseCtrl;
-  late Animation<double> _pulseAnim;
 
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2));
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
   }
 
   @override
@@ -33,10 +29,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final connected = vpn.status == VpnStatus.connected;
       final connecting = vpn.status == VpnStatus.connecting;
       final node = vpn.selectedNode;
-
-      // Start/stop pulse animation
-      if (connected && !_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
-      if (!connected && _pulseCtrl.isAnimating) _pulseCtrl.stop();
 
       return Scaffold(
         backgroundColor: AppTheme.bg,
@@ -54,18 +46,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
             // Power button + status
             Expanded(flex: 2, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              AnimatedBuilder(animation: _pulseAnim, builder: (BuildContext _, Widget? __) {
-                return Transform.scale(scale: connected ? _pulseAnim.value : 1.0,
-                  child: GestureDetector(onTap: vpn.busy ? null : vpn.toggle,
-                    child: AnimatedContainer(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic,
-                      width: 180, height: 180,
-                      decoration: BoxDecoration(shape: BoxShape.circle,
-                        color: connected ? AppTheme.success.withOpacity(0.15) : AppTheme.card,
-                        border: Border.all(width: 4, color: connected ? AppTheme.success : connecting ? AppTheme.accent : AppTheme.textSecondary.withOpacity(0.3))),
-                      child: Icon(
-                        connected ? Icons.stop_rounded : connecting ? Icons.hourglass_top_rounded : Icons.play_arrow_rounded,
-                        size: 72, color: connected ? AppTheme.success : connecting ? AppTheme.accent : AppTheme.textSecondary))));
-              }),
+              GestureDetector(onTap: vpn.busy ? null : vpn.toggle,
+                child: AnimatedContainer(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic,
+                  width: 180, height: 180,
+                  decoration: BoxDecoration(shape: BoxShape.circle,
+                    color: connected ? AppTheme.success.withOpacity(0.15) : AppTheme.card,
+                    border: Border.all(width: 4, color: connected ? AppTheme.success : connecting ? AppTheme.accent : AppTheme.textSecondary.withOpacity(0.3))),
+                  child: Icon(
+                    connected ? Icons.stop_rounded : connecting ? Icons.hourglass_top_rounded : Icons.play_arrow_rounded,
+                    size: 72, color: connected ? AppTheme.success : connecting ? AppTheme.accent : AppTheme.textSecondary))),
               const SizedBox(height: 20),
               AnimatedSwitcher(duration: const Duration(milliseconds: 300),
                 child: Text(
