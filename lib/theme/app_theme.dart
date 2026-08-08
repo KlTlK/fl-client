@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const bg = Color(0xFF0A0818);
-  static const surface = Color(0xFF1C1735);
-  static const card = Color(0xFF2A2348);
-  static const accent = Color(0xFF7B8CFF);
-  static const accentSoft = Color(0xFFA0AEFF);
-  static const success = Color(0xFF4ADEAA);
-  static const danger = Color(0xFFFF6B6B);
-  static const textPrimary = Color(0xFFF8F7FF);
-  static const textSecondary = Color(0xFFB8B2D0);
+  static const bg = Color(0xFF0F0F0F);
+  static const surface = Color(0xFF1A1A1A);
+  static const card = Color(0xFF252525);
+  static const accent = Color(0xFF00D4AA);
+  static const accentSoft = Color(0xFF00FFD0);
+  static const success = Color(0xFF00E676);
+  static const danger = Color(0xFFFF5252);
+  static const textPrimary = Color(0xFFFFFFFF);
+  static const textSecondary = Color(0xFFAAAAAA);
 
   static ThemeData get dark => ThemeData(
     useMaterial3: true,
@@ -24,7 +24,7 @@ class AppTheme {
     appBarTheme: const AppBarTheme(backgroundColor: bg, foregroundColor: textPrimary, elevation: 0),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: accent, foregroundColor: Colors.white,
+        backgroundColor: accent, foregroundColor: Color(0xFF0F0F0F),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     ),
