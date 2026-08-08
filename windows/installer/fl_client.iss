@@ -1,11 +1,11 @@
 [Setup]
 AppName=fl-client
-AppVersion=0.8.0
+AppVersion=0.9.0
 AppPublisher=KITIK
 DefaultDirName={autopf}\fl-client
 DefaultGroupName=fl-client
 OutputBaseFilename=fl-client-setup
-OutputDir=Output
+OutputDir=..\..\Output
 Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -20,7 +20,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\fl-client"; Filename: "{app}\fl_client.exe"
